@@ -14,6 +14,8 @@ Source0:        stable-diffusion.cpp-20241130.tar.xz
 BuildRequires:	cmake
 BuildRequires:	curl-devel
 BuildRequires:	cmake(libzip)
+BuildRequires:  pkgconfig(openblas)
+BuildRequires:  pkgconfig(vulkan)
 
 %description
 Plain C/C++ implementation based on ggml, working in the same way as llama.cpp

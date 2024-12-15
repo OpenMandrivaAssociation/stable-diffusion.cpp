@@ -16,6 +16,9 @@ BuildRequires:	curl-devel
 BuildRequires:	cmake(libzip)
 BuildRequires:  pkgconfig(openblas)
 BuildRequires:  pkgconfig(vulkan)
+BuildRequires:  glslang-devel
+BuildRequires:  pkgconfig(shaderc)
+BuildRequires:  glslc
 
 %description
 Plain C/C++ implementation based on ggml, working in the same way as llama.cpp

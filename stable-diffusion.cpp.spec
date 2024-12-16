@@ -19,7 +19,7 @@ BuildRequires:  glslang-devel
 BuildRequires:  pkgconfig(shaderc)
 BuildRequires:  glslc
 BuildSystem:	cmake
-BuildOption:	-DSD_USE_VULKAN=1
+BuildOption:	-DSD_VULKAN=1
 BuildOption:	-DSD_BUILD_SHARED_LIBS=1
 BuildOption:	-DGGML_OPENMP=1
 BuildOption:	-DGGML_BLAS=ON

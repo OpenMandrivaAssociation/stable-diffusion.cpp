@@ -1,0 +1,12 @@
+diff -up stable-diffusion.cpp-20241130/CMakeLists.txt.omv~ stable-diffusion.cpp-20241130/CMakeLists.txt
+--- stable-diffusion.cpp-20241130/CMakeLists.txt.omv~	2024-12-16 17:50:33.531866041 +0100
++++ stable-diffusion.cpp-20241130/CMakeLists.txt	2024-12-16 17:51:23.840463076 +0100
+@@ -74,6 +74,8 @@ if(SD_BUILD_SHARED_LIBS)
+     message(${SD_LIB_SOURCES})
+     set(BUILD_SHARED_LIBS OFF)
+     add_library(${SD_LIB} SHARED ${SD_LIB_SOURCES})
++    set_target_properties(${SD_LIB} PROPERTIES VERSION 0.0 SOVERSION 0)
++    install(TARGETS ${SD_LIB} DESTINATION ${CMAKE_INSTALL_LIBDIR})
+     add_definitions(-DSD_BUILD_SHARED_LIB)
+     target_compile_definitions(${SD_LIB} PRIVATE -DSD_BUILD_DLL)
+     set(CMAKE_POSITION_INDEPENDENT_CODE ON)

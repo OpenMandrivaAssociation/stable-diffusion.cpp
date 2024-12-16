@@ -44,3 +44,7 @@ Plain C/C++ implementation based on ggml, working in the same way as llama.cpp
 %files
 %license LICENSE
 %doc README.md
+%{_bindir}/sd
+%{_bindir}/vulkan-shaders-gen
+%{_includedir}/
+%{_libdir}/libggml*

@@ -34,7 +34,7 @@ Plain C/C++ implementation based on ggml, working in the same way as llama.cpp
 %build
 %cmake -DSD_USE_VULKAN=1 -DSD_BUILD_SHARED_LIBS=1 -DGGML_OPENMP=1 \
 -DGGML_BLAS=ON -DGGML_BLAS_VENDOR=OpenBLAS -DLLAMA_CLBLAST=ON  -DGGML_MAX_NAME=128 \
--DGGML_VULKAN=1
+-DGGML_VULKAN=1 -DGGML_AVX=OFF -DGGML_AVX2=OFF -DGGML_AVX515=OFF
 %make_build
 
 %install

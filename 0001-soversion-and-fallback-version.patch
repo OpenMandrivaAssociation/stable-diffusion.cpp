@@ -1,0 +1,29 @@
+From: OpenMandriva
+Subject: [PATCH] Give libstable-diffusion a SOVERSION and a numeric fallback
+
+write_basic_package_version_file() rejects VERSION "unknown" when
+the source tarball has no .git. Git describe also fails there.
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -257,7 +257,7 @@
+ endif()
+ 
+ if(NOT SDCPP_BUILD_VERSION)
+-    set(SDCPP_BUILD_VERSION unknown)
++    set(SDCPP_BUILD_VERSION 0.820.0)
+ endif()
+ message(STATUS "stable-diffusion.cpp version ${SDCPP_BUILD_VERSION}")
+ 
+@@ -366,7 +366,9 @@
+ 
+ set_target_properties(${SD_LIB}
+     PROPERTIES
+-        PUBLIC_HEADER "${SD_PUBLIC_HEADERS}")
++        PUBLIC_HEADER "${SD_PUBLIC_HEADERS}"
++        VERSION 0.820.0
++        SOVERSION 0)
+ 
+ 
+ install(TARGETS ${SD_LIB}

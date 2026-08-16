@@ -1,0 +1,52 @@
+From: OpenMandriva
+Subject: [PATCH] Fallbacks for I8 kernels that exist only in leejet/ggml
+
+stable-diffusion.cpp's vendored ggml fork adds
+ggml_mul_mat_i8_tensorwise and ggml_quantize_i8_convrot. Stock
+ggml-org 0.19 (SD_USE_SYSTEM_GGML) does not. Dequantise and use
+ggml_mul_mat so I8-convrot models still run, without the specialised
+kernel.
+
+diff --git a/src/core/ggml_extend.hpp b/src/core/ggml_extend.hpp
+--- a/src/core/ggml_extend.hpp
++++ b/src/core/ggml_extend.hpp
+@@ -31,6 +31,39 @@
+ #include "ggml-backend.h"
+ #include "ggml.h"
+ 
++#ifndef GGML_HAS_I8_TENSORWISE
++/* leejet/ggml only. Provide a dequant + mul_mat stand-in. */
++static inline struct ggml_tensor* ggml_mul_mat_i8_tensorwise(
++    struct ggml_context* ctx,
++    struct ggml_tensor* w,
++    struct ggml_tensor* x,
++    struct ggml_tensor* weight_scale,
++    struct ggml_tensor* fused_bias,
++    int convrot_group_size)
++{
++    (void)convrot_group_size;
++    struct ggml_tensor* wf = ggml_cast(ctx, w, GGML_TYPE_F32);
++    if (weight_scale) {
++        wf = ggml_mul(ctx, wf, weight_scale);
++    }
++    struct ggml_tensor* y = ggml_mul_mat(ctx, wf, x);
++    if (fused_bias) {
++        y = ggml_add_inplace(ctx, y, fused_bias);
++    }
++    return y;
++}
++
++static inline struct ggml_tensor* ggml_quantize_i8_convrot(
++    struct ggml_context* ctx,
++    struct ggml_tensor* x,
++    int group_size)
++{
++    (void)ctx;
++    (void)group_size;
++    return x;
++}
++#endif
++
+ #include "core/tensor.hpp"
+ #include "model.h"
+ 

@@ -17,6 +17,8 @@
 
 Summary:		Diffusion model inference in C/C++ (stable-diffusion.cpp)
 Name:			stable-diffusion.cpp
+# Old snapshot was Version: 0.20241130, which rpmvercmp ranks above 0.820.
+Epoch:			1
 Version:		0.820
 Release:		1
 License:		MIT
@@ -104,9 +106,9 @@ native /sdcpp/v1 routes. Built without the pnpm frontend (ABF has
 no network); the JSON API still works.
 
 Config: %{_sysconfdir}/sysconfig/sd-server
-Unit:   stable-diffusion.service  (default 127.0.0.1:8082, not
-        upstream 1234, so it can run next to llama-server and
-        whisper.service)
+Unit:	stable-diffusion.service (default 127.0.0.1:8082, not
+	upstream 1234, so it can run next to llama-server and
+	whisper.service)
 
   systemctl enable --now stable-diffusion.service
 
@@ -400,10 +402,10 @@ CFG
 
 %files
 %license LICENSE
-%doc README.md
 %{_libdir}/libstable-diffusion.so.*
 
 %files devel
+%doc README.md
 %{_includedir}/stable-diffusion.h
 %{_libdir}/libstable-diffusion.so
 %{_libdir}/cmake/stable-diffusion/

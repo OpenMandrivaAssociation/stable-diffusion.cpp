@@ -12,7 +12,7 @@ diff --git a/CMakeLists.txt b/CMakeLists.txt
  
  if(NOT SDCPP_BUILD_VERSION)
 -    set(SDCPP_BUILD_VERSION unknown)
-+    set(SDCPP_BUILD_VERSION 0.820.0)
++    set(SDCPP_BUILD_VERSION 0.841.0)
  endif()
  message(STATUS "stable-diffusion.cpp version ${SDCPP_BUILD_VERSION}")
  
@@ -22,7 +22,7 @@ diff --git a/CMakeLists.txt b/CMakeLists.txt
      PROPERTIES
 -        PUBLIC_HEADER "${SD_PUBLIC_HEADERS}")
 +        PUBLIC_HEADER "${SD_PUBLIC_HEADERS}"
-+        VERSION 0.820.0
++        VERSION 0.841.0
 +        SOVERSION 0)
  
  

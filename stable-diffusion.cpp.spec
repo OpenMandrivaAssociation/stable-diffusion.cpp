@@ -13,24 +13,24 @@
 %endif
 
 # Upstream tags as master-N-githash; N is the build number.
-%global upstream_tag	master-820-de298c2
+%global upstream_tag	master-841-6b3edaa
 
 Summary:		Diffusion model inference in C/C++ (stable-diffusion.cpp)
 Name:			stable-diffusion.cpp
 # Old snapshot was Version: 0.20241130, which rpmvercmp ranks above 0.820.
 Epoch:			1
-Version:		0.820
-Release:		2
+Version:		0.841
+Release:		1
 License:		MIT
 Group:			Sciences/Other
 URL:			https://github.com/leejet/stable-diffusion.cpp
 Source0:		https://github.com/leejet/stable-diffusion.cpp/archive/refs/tags/%{upstream_tag}/stable-diffusion.cpp-%{upstream_tag}.tar.gz
 # Private ggml_cgraph layout (opaque in the public headers). Must match
-# the system libggml. Refresh from ggml-0.21.0/src/ggml-impl.h when
-# bumping ggml (current drop-in already matches 0.21.0).
+# the system libggml. Refresh from ggml-0.22.0/src/ggml-impl.h when
+# bumping ggml (current drop-in already matches 0.22.0).
 Source1:		ggml-impl.h
 Patch0:			0001-soversion-and-fallback-version.patch
-# leejet/ggml has extra I8 kernels. Distro ggml 0.21 ships them
+# leejet/ggml has extra I8 kernels. Distro ggml 0.22 ships them
 # (GGML_HAS_I8_TENSORWISE); this fallback still covers a stock
 # ggml-org without the kernels.
 Patch1:			0002-system-ggml-i8-fallbacks.patch
@@ -38,13 +38,13 @@ Patch1:			0002-system-ggml-i8-fallbacks.patch
 # Prefer -O3 over distro -Os for the inference hot path
 %global optflags %{optflags} -O3
 
-BuildRequires:	cmake(ggml) >= 0.21.0
+BuildRequires:	cmake(ggml) >= 0.22.0
 BuildRequires:	git-core
 # SD_USE_SYSTEM_WEBP — WebM stays off (no pkgconfig(libwebm) in cooker)
 BuildRequires:	pkgconfig(libwebp)
 BuildRequires:	pkgconfig(libwebpmux)
 
-Requires:	%{mklibname ggml}%{?_isa} >= 0.21.0
+Requires:	%{mklibname ggml}%{?_isa} >= 0.22.0
 Recommends:	ggml-backend-blas%{?_isa}
 Recommends:	ggml-backend-vulkan%{?_isa}
 Suggests:	ggml-backend-opencl%{?_isa}

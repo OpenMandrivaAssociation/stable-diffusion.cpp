@@ -34,6 +34,9 @@ Patch0:			0001-soversion-and-fallback-version.patch
 # (GGML_HAS_I8_TENSORWISE); this fallback still covers a stock
 # ggml-org without the kernels.
 Patch1:			0002-system-ggml-i8-fallbacks.patch
+# 841 adds GGML_TYPE_F8_E4M3 / F8_E5M2 (backend-native FP8 matmul).
+# Distro ggml 0.22 has neither; restore the 820 F8-to-F16 load path.
+Patch2:			0003-system-ggml-f8-to-f16.patch
 
 # Prefer -O3 over distro -Os for the inference hot path
 %global optflags %{optflags} -O3

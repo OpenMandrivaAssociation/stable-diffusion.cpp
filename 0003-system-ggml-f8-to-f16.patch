@@ -1,0 +1,175 @@
+From: OpenMandriva
+Subject: [PATCH] Fall back to F16 when ggml has no native FP8 types
+
+leejet/ggml 841 adds GGML_TYPE_F8_E4M3 / F8_E5M2 for backend-native
+FP8 matmul. Distro ggml 0.22 has neither type. Restore the 820
+F8-to-F16 load path unless those enums exist.
+
+--- a/src/core/ggml_extend.hpp
++++ b/src/core/ggml_extend.hpp
+@@ -3469,6 +3469,7 @@
+     ggml_tensor* forward(GGMLRunnerContext* ctx, ggml_tensor* x) override {
+         ggml_tensor* w            = params["weight"];
+         ggml_tensor* weight_scale = has_weight_scale ? params["weight_scale"] : nullptr;
++#ifdef GGML_TYPE_F8_E4M3
+         if (w->type == GGML_TYPE_F8_E4M3 || w->type == GGML_TYPE_F8_E5M2) {
+             bool supports_fp8_matmul = false;
+             if (ctx->backend != nullptr) {
+@@ -3482,6 +3483,7 @@
+                 w = ggml_cast(ctx->ggml_ctx, w, GGML_TYPE_BF16);
+             }
+         }
++#endif
+         ggml_tensor* b = nullptr;
+         if (bias) {
+             b = params["bias"];
+--- a/src/model_io/safetensors_io.cpp
++++ b/src/model_io/safetensors_io.cpp
+@@ -87,9 +87,17 @@
+     } else if (dtype == "F64") {
+         ttype = GGML_TYPE_F32;
+     } else if (dtype == "F8_E4M3") {
++#ifdef GGML_TYPE_F8_E4M3
+         ttype = GGML_TYPE_F8_E4M3;
++#else
++        ttype = GGML_TYPE_F16;  // convert on load (distro ggml has no native FP8)
++#endif
+     } else if (dtype == "F8_E5M2") {
++#ifdef GGML_TYPE_F8_E5M2
+         ttype = GGML_TYPE_F8_E5M2;
++#else
++        ttype = GGML_TYPE_F16;
++#endif
+     } else if (dtype == "I32") {
+         ttype = GGML_TYPE_I32;
+     } else if (dtype == "I64") {
+@@ -328,10 +336,19 @@
+         bool tensor_size_ok;
+         if (dtype == "F8_E4M3") {
+             tensor_storage.is_f8_e4m3 = true;
+-            tensor_size_ok            = (tensor_storage.nbytes() == tensor_data_size);
++#ifdef GGML_TYPE_F8_E4M3
++            tensor_size_ok = (tensor_storage.nbytes() == tensor_data_size);
++#else
++            // f8 -> f16
++            tensor_size_ok = (tensor_storage.nbytes() == tensor_data_size * 2);
++#endif
+         } else if (dtype == "F8_E5M2") {
+             tensor_storage.is_f8_e5m2 = true;
+-            tensor_size_ok            = (tensor_storage.nbytes() == tensor_data_size);
++#ifdef GGML_TYPE_F8_E5M2
++            tensor_size_ok = (tensor_storage.nbytes() == tensor_data_size);
++#else
++            tensor_size_ok = (tensor_storage.nbytes() == tensor_data_size * 2);
++#endif
+         } else if (dtype == "F64") {
+             tensor_storage.is_f64 = true;
+             // f64 -> f32
+--- a/src/model_io/tensor_storage.h
++++ b/src/model_io/tensor_storage.h
+@@ -54,6 +54,11 @@
+     }
+ 
+     int64_t nbytes_to_read() const {
++#ifndef GGML_TYPE_F8_E4M3
++        if (is_f8_e4m3 || is_f8_e5m2) {
++            return nbytes() / 2;
++        } else
++#endif
+         if (is_f64 || is_i64) {
+             return nbytes() * 2;
+         } else {
+--- a/src/model_loader.cpp
++++ b/src/model_loader.cpp
+@@ -78,6 +78,63 @@
+     return false;
+ }
+ 
++#ifndef GGML_TYPE_F8_E4M3
++uint16_t f8_e4m3_to_f16(uint8_t f8) {
++    const uint32_t exponent_bias = 7;
++    if (f8 == 0xff) {
++        return ggml_fp32_to_fp16(-NAN);
++    } else if (f8 == 0x7f) {
++        return ggml_fp32_to_fp16(NAN);
++    }
++
++    uint32_t sign     = f8 & 0x80;
++    uint32_t exponent = (f8 & 0x78) >> 3;
++    uint32_t mantissa = f8 & 0x07;
++    uint32_t result   = sign << 24;
++    if (exponent == 0) {
++        if (mantissa > 0) {
++            exponent = 0x7f - exponent_bias;
++
++            if ((mantissa & 0x04) == 0) {
++                mantissa &= 0x03;
++                mantissa <<= 1;
++                exponent -= 1;
++            }
++            if ((mantissa & 0x04) == 0) {
++                mantissa &= 0x03;
++                mantissa <<= 1;
++                exponent -= 1;
++            }
++
++            result |= (mantissa & 0x03) << 21;
++            result |= exponent << 23;
++        }
++    } else {
++        result |= mantissa << 20;
++        exponent += 0x7f - exponent_bias;
++        result |= exponent << 23;
++    }
++
++    return ggml_fp32_to_fp16(*reinterpret_cast<const float*>(&result));
++}
++
++uint16_t f8_e5m2_to_f16(uint8_t fp8) {
++    return static_cast<uint16_t>(fp8) << 8;
++}
++
++void f8_e4m3_to_f16_vec(uint8_t* src, uint16_t* dst, int64_t n) {
++    for (int64_t i = n - 1; i >= 0; i--) {
++        dst[i] = f8_e4m3_to_f16(src[i]);
++    }
++}
++
++void f8_e5m2_to_f16_vec(uint8_t* src, uint16_t* dst, int64_t n) {
++    for (int64_t i = n - 1; i >= 0; i--) {
++        dst[i] = f8_e5m2_to_f16(src[i]);
++    }
++}
++#endif
++
+ void f64_to_f32_vec(double* src, float* dst, int64_t n) {
+     // support inplace op
+     for (int64_t i = 0; i < n; i++) {
+@@ -869,7 +926,12 @@
+             if (dst_tensor == nullptr)
+                 continue;
+ 
+-            if (tensor_storage.is_f64 ||
++            if (
++#ifndef GGML_TYPE_F8_E4M3
++                tensor_storage.is_f8_e4m3 ||
++                tensor_storage.is_f8_e5m2 ||
++#endif
++                tensor_storage.is_f64 ||
+                 tensor_storage.is_i64 ||
+                 tensor_storage.type != dst_tensor->type) {
+                 continue;
+@@ -1153,6 +1215,13 @@
+                     read_time_ms.fetch_add(t1 - t0);
+ 
+                     t0 = ggml_time_ms();
++#ifndef GGML_TYPE_F8_E4M3
++                    if (tensor_storage.is_f8_e4m3) {
++                        f8_e4m3_to_f16_vec((uint8_t*)read_buf, (uint16_t*)target_buf, tensor_storage.nelements());
++                    } else if (tensor_storage.is_f8_e5m2) {
++                        f8_e5m2_to_f16_vec((uint8_t*)read_buf, (uint16_t*)target_buf, tensor_storage.nelements());
++                    } else
++#endif
+                     if (tensor_storage.is_f64) {
+                         f64_to_f32_vec((double*)read_buf, (float*)target_buf, tensor_storage.nelements());
+                     } else if (tensor_storage.is_i64) {

@@ -38,6 +38,9 @@ Patch1:			0002-system-ggml-i8-fallbacks.patch
 # 841 adds GGML_TYPE_F8_E4M3 / F8_E5M2 (backend-native FP8 matmul).
 # Distro ggml 1.0 has F8_E4M3 only; keep the F16 load path for F8_E5M2.
 Patch2:			0003-system-ggml-f8-to-f16.patch
+# ggml 1.0 removed ggml_mul_mat_set_prec, ggml_flash_attn_ext_set_prec
+# and ggml_diag_mask_inf. Precision goes through ggml_prec_set_acc.
+Patch3:			0004-ggml-1.0-api.patch
 
 # Prefer -O3 over distro -Os for the inference hot path
 %global optflags %{optflags} -O3

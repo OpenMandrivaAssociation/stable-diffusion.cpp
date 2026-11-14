@@ -20,7 +20,7 @@ Name:			stable-diffusion.cpp
 # Old snapshot was Version: 0.20241130, which rpmvercmp ranks above 0.820.
 Epoch:			1
 Version:		0.841
-Release:		2
+Release:		3
 License:		MIT
 Group:			Sciences/Other
 URL:			https://github.com/leejet/stable-diffusion.cpp
@@ -28,27 +28,27 @@ Source0:		https://github.com/leejet/stable-diffusion.cpp/archive/refs/tags/%{ups
 # Private ggml_cgraph layout (opaque in the public headers). Must match
 # the system libggml, including the SYCL arm_neon.h guard. Refresh from
 # the patched ggml src/ggml-impl.h when bumping ggml (this drop-in
-# matches ggml 0.28.0).
+# matches ggml 1.0.0).
 Source1:		ggml-impl.h
 Patch0:			0001-soversion-and-fallback-version.patch
-# leejet/ggml has extra I8 kernels. Distro ggml 0.28 ships them
+# leejet/ggml has extra I8 kernels. Distro ggml 1.0 ships them
 # (GGML_HAS_I8_TENSORWISE); this fallback still covers a stock
 # ggml-org without the kernels.
 Patch1:			0002-system-ggml-i8-fallbacks.patch
 # 841 adds GGML_TYPE_F8_E4M3 / F8_E5M2 (backend-native FP8 matmul).
-# Distro ggml 0.28 has neither; restore the 820 F8-to-F16 load path.
+# Distro ggml 1.0 has F8_E4M3 only; keep the F16 load path for F8_E5M2.
 Patch2:			0003-system-ggml-f8-to-f16.patch
 
 # Prefer -O3 over distro -Os for the inference hot path
 %global optflags %{optflags} -O3
 
-BuildRequires:	cmake(ggml) >= 0.28.0
+BuildRequires:	cmake(ggml) >= 1.0.0
 BuildRequires:	git-core
 # SD_USE_SYSTEM_WEBP — WebM stays off (no pkgconfig(libwebm) in cooker)
 BuildRequires:	pkgconfig(libwebp)
 BuildRequires:	pkgconfig(libwebpmux)
 
-Requires:	%{mklibname ggml}%{?_isa} >= 0.28.0
+Requires:	%{mklibname ggml}%{?_isa} >= 1.0.0
 Recommends:	ggml-backend-blas%{?_isa}
 Recommends:	ggml-backend-vulkan%{?_isa}
 Suggests:	ggml-backend-opencl%{?_isa}
@@ -91,7 +91,7 @@ is in %{name}-server.
 Summary:	Development files for %{name}
 Group:		Development/C++
 Requires:	%{name}%{?_isa} = %{EVRD}
-Requires:	cmake(ggml) >= 0.28.0
+Requires:	cmake(ggml) >= 1.0.0
 
 %description devel
 Headers, pkg-config and CMake package config for stable-diffusion.cpp.

@@ -1,21 +1,29 @@
 From: OpenMandriva
-Subject: [PATCH] Fall back to F16 when ggml has no native FP8 types
+Subject: [PATCH] Fall back to F16 when ggml has no native FP8 type
 
 leejet/ggml 841 adds GGML_TYPE_F8_E4M3 / F8_E5M2 for backend-native
-FP8 matmul. Distro ggml 0.22 has neither type. Restore the 820
-F8-to-F16 load path unless those enums exist.
+FP8 matmul. Distro ggml 1.0 has F8_E4M3 only. Use the native type
+when the enum exists, and keep the F16 load path for the one that
+does not.
 
---- a/src/core/ggml_extend.hpp
-+++ b/src/core/ggml_extend.hpp
-@@ -3469,6 +3469,7 @@
+diff -ruN a/src/core/ggml_extend.hpp b/src/core/ggml_extend.hpp
+--- a/src/core/ggml_extend.hpp	2026-11-14 06:45:18.858772309 +0100
++++ b/src/core/ggml_extend.hpp	2026-11-14 06:45:37.566689900 +0100
+@@ -3502,7 +3502,12 @@
      ggml_tensor* forward(GGMLRunnerContext* ctx, ggml_tensor* x) override {
          ggml_tensor* w            = params["weight"];
          ggml_tensor* weight_scale = has_weight_scale ? params["weight_scale"] : nullptr;
+-        if (w->type == GGML_TYPE_F8_E4M3 || w->type == GGML_TYPE_F8_E5M2) {
 +#ifdef GGML_TYPE_F8_E4M3
-         if (w->type == GGML_TYPE_F8_E4M3 || w->type == GGML_TYPE_F8_E5M2) {
++        if (w->type == GGML_TYPE_F8_E4M3
++#ifdef GGML_TYPE_F8_E5M2
++            || w->type == GGML_TYPE_F8_E5M2
++#endif
++        ) {
              bool supports_fp8_matmul = false;
              if (ctx->backend != nullptr) {
-@@ -3482,6 +3483,7 @@
+                 ggml_tensor* fp8_matmul = ggml_mul_mat(ctx->ggml_ctx, w, x);
+@@ -3515,6 +3520,7 @@
                  w = ggml_cast(ctx->ggml_ctx, w, GGML_TYPE_BF16);
              }
          }
@@ -23,8 +31,9 @@ F8-to-F16 load path unless those enums exist.
          ggml_tensor* b = nullptr;
          if (bias) {
              b = params["bias"];
---- a/src/model_io/safetensors_io.cpp
-+++ b/src/model_io/safetensors_io.cpp
+diff -ruN a/src/model_io/safetensors_io.cpp b/src/model_io/safetensors_io.cpp
+--- a/src/model_io/safetensors_io.cpp	2026-08-30 18:11:38.000000000 +0200
++++ b/src/model_io/safetensors_io.cpp	2026-11-14 06:45:19.106007100 +0100
 @@ -87,9 +87,17 @@
      } else if (dtype == "F64") {
          ttype = GGML_TYPE_F32;
@@ -65,23 +74,32 @@ F8-to-F16 load path unless those enums exist.
          } else if (dtype == "F64") {
              tensor_storage.is_f64 = true;
              // f64 -> f32
---- a/src/model_io/tensor_storage.h
-+++ b/src/model_io/tensor_storage.h
-@@ -54,6 +54,11 @@
+diff -ruN a/src/model_io/tensor_storage.h b/src/model_io/tensor_storage.h
+--- a/src/model_io/tensor_storage.h	2026-08-30 18:11:38.000000000 +0200
++++ b/src/model_io/tensor_storage.h	2026-11-14 06:45:37.572074500 +0100
+@@ -54,6 +54,18 @@
      }
  
      int64_t nbytes_to_read() const {
++#if !defined(GGML_TYPE_F8_E4M3) || !defined(GGML_TYPE_F8_E5M2)
++        if (false
 +#ifndef GGML_TYPE_F8_E4M3
-+        if (is_f8_e4m3 || is_f8_e5m2) {
++            || is_f8_e4m3
++#endif
++#ifndef GGML_TYPE_F8_E5M2
++            || is_f8_e5m2
++#endif
++        ) {
 +            return nbytes() / 2;
 +        } else
 +#endif
          if (is_f64 || is_i64) {
              return nbytes() * 2;
          } else {
---- a/src/model_loader.cpp
-+++ b/src/model_loader.cpp
-@@ -78,6 +78,63 @@
+diff -ruN a/src/model_loader.cpp b/src/model_loader.cpp
+--- a/src/model_loader.cpp	2026-08-30 18:11:38.000000000 +0200
++++ b/src/model_loader.cpp	2026-11-14 06:45:37.964078047 +0100
+@@ -78,6 +78,65 @@
      return false;
  }
  
@@ -125,14 +143,16 @@ F8-to-F16 load path unless those enums exist.
 +    return ggml_fp32_to_fp16(*reinterpret_cast<const float*>(&result));
 +}
 +
-+uint16_t f8_e5m2_to_f16(uint8_t fp8) {
-+    return static_cast<uint16_t>(fp8) << 8;
-+}
-+
 +void f8_e4m3_to_f16_vec(uint8_t* src, uint16_t* dst, int64_t n) {
 +    for (int64_t i = n - 1; i >= 0; i--) {
 +        dst[i] = f8_e4m3_to_f16(src[i]);
 +    }
++}
++#endif
++
++#ifndef GGML_TYPE_F8_E5M2
++uint16_t f8_e5m2_to_f16(uint8_t fp8) {
++    return static_cast<uint16_t>(fp8) << 8;
 +}
 +
 +void f8_e5m2_to_f16_vec(uint8_t* src, uint16_t* dst, int64_t n) {
@@ -145,7 +165,7 @@ F8-to-F16 load path unless those enums exist.
  void f64_to_f32_vec(double* src, float* dst, int64_t n) {
      // support inplace op
      for (int64_t i = 0; i < n; i++) {
-@@ -869,7 +926,12 @@
+@@ -869,7 +928,14 @@
              if (dst_tensor == nullptr)
                  continue;
  
@@ -153,20 +173,25 @@ F8-to-F16 load path unless those enums exist.
 +            if (
 +#ifndef GGML_TYPE_F8_E4M3
 +                tensor_storage.is_f8_e4m3 ||
++#endif
++#ifndef GGML_TYPE_F8_E5M2
 +                tensor_storage.is_f8_e5m2 ||
 +#endif
 +                tensor_storage.is_f64 ||
                  tensor_storage.is_i64 ||
                  tensor_storage.type != dst_tensor->type) {
                  continue;
-@@ -1153,6 +1215,13 @@
+@@ -1153,6 +1219,16 @@
                      read_time_ms.fetch_add(t1 - t0);
  
                      t0 = ggml_time_ms();
 +#ifndef GGML_TYPE_F8_E4M3
 +                    if (tensor_storage.is_f8_e4m3) {
 +                        f8_e4m3_to_f16_vec((uint8_t*)read_buf, (uint16_t*)target_buf, tensor_storage.nelements());
-+                    } else if (tensor_storage.is_f8_e5m2) {
++                    } else
++#endif
++#ifndef GGML_TYPE_F8_E5M2
++                    if (tensor_storage.is_f8_e5m2) {
 +                        f8_e5m2_to_f16_vec((uint8_t*)read_buf, (uint16_t*)target_buf, tensor_storage.nelements());
 +                    } else
 +#endif
